@@ -34,7 +34,7 @@ namespace z80gdbserver
 				file = File.ReadAllBytes(args[0]);
 			else
 			{
-				Console.WriteLine("Usage: z80gdbserver [--pause] [filename]");
+				Console.WriteLine("Usage: z80gdbserver [filename] [--pause]");
 				Console.WriteLine("Server is using 2000 TCP port");
 				Console.WriteLine("filename not specified so using hardcoded example");
 				Console.WriteLine("-----");
