@@ -22,26 +22,30 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using ZXMAK2.Engine.Interfaces;
 
 namespace z80gdbserver
 {
-	public class GDBNetworkServer
+	public class GDBNetworkServer : IDisposable
 	{
 		ASCIIEncoding encoder = new ASCIIEncoding();
 		
 		TcpListener listener;
-		IEmulator emulator;
-		
+		IDebuggable emulator;
+		Thread socketListener;
+
 		List<TcpClient> clients = new List<TcpClient>();
-		
-		public GDBNetworkServer(IEmulator emulator)
+
+		StreamWriter log = null;
+
+		public GDBNetworkServer(IDebuggable emulator)
 		{
 			this.emulator = emulator;
 			
 			listener = new TcpListener(IPAddress.Any, 2000);
 			listener.Start ();
 			
-			Thread socketListener = new Thread(ListeningThread);
+			socketListener = new Thread(ListeningThread);
 			socketListener.Start();
 		}
 		
@@ -76,8 +80,11 @@ namespace z80gdbserver
 
 			byte[] message = new byte[0x1000];
 			int bytesRead;
-			
-			emulator.Pause();
+
+			// log = new StreamWriter("c:\\temp\\log.txt");
+			// log.AutoFlush = true;
+
+			emulator.DoStop();
 			
 			while (true) {
 				bytesRead = 0;
@@ -97,7 +104,7 @@ namespace z80gdbserver
 				if (bytesRead > 0)
 				{
 					GDBPacket packet = new GDBPacket(message, bytesRead);
-					Console.WriteLine("--> " + packet.ToString());
+					if (log != null) log.WriteLine("--> " + packet.ToString());
 					string response = session.ParseRequest(packet);
 					if (response != null)
 					{
@@ -106,13 +113,28 @@ namespace z80gdbserver
 				}
 			}
 			tcpClient.Close ();
+			log.Close();
 		}
 		
 		void SendResponse(Stream stream, string response)
 		{
-			Console.WriteLine("<-- " + response);
+			if (log != null) log.WriteLine("<-- " + response);
 			byte[] bytes = encoder.GetBytes(response);
 			stream.Write(bytes, 0, bytes.Length);	
+		}
+
+		public void Dispose()
+		{
+			if (socketListener != null)
+				socketListener.Abort();
+
+			foreach (var client in clients)
+				if (client.Connected)
+					client.Close();
+
+			// Easiest way to stop all threads, lol
+			// TODO: add correct handling of all used stuff instead of this
+			System.Diagnostics.Process.GetCurrentProcess().Kill();
 		}
 	}
 }

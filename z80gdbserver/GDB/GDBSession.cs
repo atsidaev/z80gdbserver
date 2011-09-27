@@ -22,6 +22,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 
 using ZXMAK2.Engine.Z80;
+using ZXMAK2.Engine.Interfaces;
 
 namespace z80gdbserver
 {
@@ -36,9 +37,9 @@ namespace z80gdbserver
 			public const string HaltedReason = "T05thread:00;";
 		}
 		
-		IEmulator emulator;
-		
-		public GDBSession(IEmulator emulator)
+		IDebuggable emulator;
+
+		public GDBSession(IDebuggable emulator)
 		{
 			this.emulator = emulator;
 		}
@@ -107,7 +108,7 @@ namespace z80gdbserver
 
 		public string GetRegisterAsHex(int reg)
 		{
-			int result = regGetters[reg](emulator.GetCPU().regs);
+			int result = regGetters[reg](emulator.CPU.regs);
 			if (registerSize[reg] == RegisterSize.Byte)
 				return ((byte)(result)).ToLowEndianHexString();
 			else
@@ -122,7 +123,7 @@ namespace z80gdbserver
 			else
 				val = Convert.ToUInt16(hexValue, 16);
 				
-			regSetters[reg](emulator.GetCPU().regs, (ushort)val);
+			regSetters[reg](emulator.CPU.regs, (ushort)val);
 			
 			return true;
 		}
@@ -159,7 +160,8 @@ namespace z80gdbserver
 			case 'M': // write memory
 				result = WriteMemory(packet);break;
 			case 'X': // write memory binary
-				result = StandartAnswers.OK;
+				// Not implemented yet, client shoul use M instead
+				//result = StandartAnswers.OK;
 				break;
 			case 'p': // get single register
 				result = GetRegister(packet);break;
@@ -168,7 +170,7 @@ namespace z80gdbserver
 			case 'v': // some requests, mainly vCont
 				result = ExecutionRequest(packet);break;
 			case 's': //stepi
-				emulator.GetCPU().ExecCycle();
+				emulator.CPU.ExecCycle();
 				result = "T05";
 				break;
 			case 'z': // remove bp
@@ -183,11 +185,11 @@ namespace z80gdbserver
 				result = StandartAnswers.OK; // we do not have threads, so ignoring this command is OK
 				break;
 			case 'c': // continue
-				emulator.Run();
+				emulator.DoRun();
 				result = null;
 				break;
 			case 'D': // Detach from client
-				emulator.Run();
+				emulator.DoRun();
 				result = StandartAnswers.OK;
 				break;
 			}
@@ -253,10 +255,10 @@ namespace z80gdbserver
 			string[] parameters = packet.GetCommandParameters();
 			var addr = Convert.ToUInt16(parameters[0], 16);
 			if (int.Parse(parameters[1]) == 1)
-				return emulator.GetCPU().RDMEM(addr).ToLowEndianHexString();
+				return emulator.CPU.RDMEM(addr).ToLowEndianHexString();
 			else
 				if (int.Parse(parameters[1]) == 2)
-					return ((ushort)(emulator.GetCPU().RDMEM(addr) + (emulator.GetCPU().RDMEM((ushort)(addr + 1)) << 8))).ToLowEndianHexString();
+					return ((ushort)(emulator.CPU.RDMEM(addr) + (emulator.CPU.RDMEM((ushort)(addr + 1)) << 8))).ToLowEndianHexString();
 			else
 				return StandartAnswers.Error;
 		}
@@ -266,12 +268,12 @@ namespace z80gdbserver
 			string[] parameters = packet.GetCommandParameters();
 			ushort addr = Convert.ToUInt16(parameters[0], 16);
 			if (int.Parse(parameters[1]) == 1)
-				emulator.GetCPU().WRMEM(addr, (byte)Convert.ToUInt16(parameters[2], 16));
+				emulator.CPU.WRMEM(addr, (byte)Convert.ToUInt16(parameters[2], 16));
 			else
 				if (int.Parse(parameters[1]) == 2)
 				{
-					emulator.GetCPU().WRMEM(addr, (byte)Convert.ToUInt16(parameters[2].Substring(0, 2), 16));
-					emulator.GetCPU().WRMEM((ushort)(addr + 1), (byte)Convert.ToUInt16(parameters[2].Substring(2, 2), 16));
+					emulator.CPU.WRMEM(addr, (byte)Convert.ToUInt16(parameters[2].Substring(0, 2), 16));
+					emulator.CPU.WRMEM((ushort)(addr + 1), (byte)Convert.ToUInt16(parameters[2].Substring(2, 2), 16));
 				}
 				else
 					return StandartAnswers.Error;
@@ -294,14 +296,18 @@ namespace z80gdbserver
 		string SetBreakpoint(GDBPacket packet)
 		{
 			string[] parameters = packet.GetCommandParameters();
-			emulator.SetBreakpoint(Breakpoint.GetBreakpointType(int.Parse(parameters[0])), Convert.ToUInt16(parameters[1], 16));
+			Breakpoint.BreakpointType type = Breakpoint.GetBreakpointType(int.Parse(parameters[0]));
+			ushort addr = Convert.ToUInt16(parameters[1], 16);
+			emulator.AddBreakpoint(addr);
 			return StandartAnswers.OK;
 		}
 		
 		string RemoveBreakpoint(GDBPacket packet)
 		{
 			string[] parameters = packet.GetCommandParameters();
-			emulator.RemoveBreakpoint(Breakpoint.GetBreakpointType(int.Parse(parameters[0])), Convert.ToUInt16(parameters[1], 16));
+			Breakpoint.BreakpointType type = Breakpoint.GetBreakpointType(int.Parse(parameters[0]));
+			ushort addr = Convert.ToUInt16(parameters[1], 16);
+			emulator.RemoveBreakpoint(addr);
 			return StandartAnswers.OK;
 		}
 	}

@@ -22,24 +22,23 @@ using System.Text.RegularExpressions;
 using System.Threading;
 
 using ZXMAK2.Engine.Z80;
+using ZXMAK2.Engine.Interfaces;
 
 namespace z80gdbserver
 {
 	public class GNUDebugBridge : IDebugBridge
 	{
 		GDBNetworkServer server;
-		
-		public void Initialize (IEmulator emulator)
+		IDebuggable emulator;
+
+		public void Initialize(IDebuggable emulator)
 		{
-			emulator.OnBreakpoint += OnBreakpoint;
-			
+			this.emulator = emulator;
+
 			server = new GDBNetworkServer(emulator);
 		}
 		
-		void OnBreakpoint(Breakpoint breakpoint)
-		{
-			server.Breakpoint(breakpoint);
-		}
+
 	}
 }
 

@@ -17,12 +17,13 @@
 using System;
 
 using ZXMAK2.Engine.Z80;
+using ZXMAK2.Engine.Interfaces;
 
 namespace z80gdbserver
 {
 	public interface IDebugBridge
 	{
-		void Initialize(IEmulator emulator);
+		void Initialize(IDebuggable emulator);
 	}
 }
 
