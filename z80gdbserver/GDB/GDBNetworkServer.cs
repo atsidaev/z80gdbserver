@@ -113,7 +113,9 @@ namespace z80gdbserver
 				}
 			}
 			tcpClient.Close ();
-			log.Close();
+			
+			if (log != null) 
+				log.Close();
 		}
 		
 		void SendResponse(Stream stream, string response)
@@ -126,15 +128,15 @@ namespace z80gdbserver
 		public void Dispose()
 		{
 			if (socketListener != null)
+			{
+				listener.Stop();
+
+				foreach (var client in clients)
+					if (client.Connected)
+						client.Close();
+
 				socketListener.Abort();
-
-			foreach (var client in clients)
-				if (client.Connected)
-					client.Close();
-
-			// Easiest way to stop all threads, lol
-			// TODO: add correct handling of all used stuff instead of this
-			System.Diagnostics.Process.GetCurrentProcess().Kill();
+			}
 		}
 	}
 }

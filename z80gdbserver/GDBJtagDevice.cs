@@ -17,7 +17,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 
 using ZXMAK2.Engine.Z80;
 using ZXMAK2.Engine.Interfaces;
@@ -32,18 +31,15 @@ namespace z80gdbserver
 		public void Attach(IDebuggable dbg)
 		{
 			emulator = dbg;
+			emulator.Breakpoint += OnBreakpoint;
 
-			dbg.AddBreakpoint(0x9c40);
-			dbg.Breakpoint += OnBreakpoint;
-
-			server = new GDBNetworkServer(dbg);
+			server = new GDBNetworkServer(emulator);
 		}
 
 		public void Detach()
 		{
 			server.Dispose();
 		}
-
 
 		public void BusConnect()
 		{
@@ -74,7 +70,7 @@ namespace z80gdbserver
 
 		public string Description
 		{
-			get { return "HEllo, world!"; }
+			get { return "Interface for interaction with gdb debugger "; }
 		}
 
 		public string Name
