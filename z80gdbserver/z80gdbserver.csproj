@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -57,15 +57,15 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="ZXMAK2">
-      <HintPath>..\..\..\Distr\zxmak\ZXMAK2.exe</HintPath>
+    <Reference Include="ZXMAK2, Version=2.2.2.0, Culture=neutral, processorArchitecture=x86">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\utils\zxmak\ZXMAK2.exe</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Breakpoint.cs" />
     <Compile Include="GDBJtagDevice.cs" />
     <Compile Include="Interfaces\IDebugBridge.cs" />
-    <Compile Include="Interfaces\IEmulator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="GDB\GDBNetworkServer.cs" />

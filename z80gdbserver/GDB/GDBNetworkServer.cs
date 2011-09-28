@@ -51,24 +51,38 @@ namespace z80gdbserver
 		
 		public void Breakpoint(Breakpoint breakpoint)
 		{
+			SendGlobal(GDBSession.FormatResponse(GDBSession.StandartAnswers.Breakpoint));
+		}
+
+		private void SendGlobal(string message)
+		{
 			foreach (var client in clients.Where(c => c.Connected))
 			{
 				var stream = client.GetStream();
 				if (stream != null)
-					SendResponse(stream, GDBSession.FormatResponse(GDBSession.StandartAnswers.Breakpoint));
+					SendResponse(stream, message);
 			}
 		}
 		
 		private void ListeningThread(object obj)
 		{
-			while (true) {
-				TcpClient client = listener.AcceptTcpClient();
-				
-				clients.Add(client);
-				clients.RemoveAll(c => !c.Connected);
-				
-				Thread clientThread = new Thread(GDBClientConnected);
-				clientThread.Start(client);
+			try
+			{
+				while (true)
+				{
+					TcpClient client = listener.AcceptTcpClient();
+
+					clients.Add(client);
+					clients.RemoveAll(c => !c.Connected);
+
+					Thread clientThread = new Thread(GDBClientConnected);
+					clientThread.Start(client);
+				}
+			}
+			catch
+			{
+				// Here can be an exception because we interrupting blocking AcceptTcpClient()
+				// call on Dispose. We should not fail here, so try/catching
 			}
 		}
 		
@@ -105,10 +119,15 @@ namespace z80gdbserver
 				{
 					GDBPacket packet = new GDBPacket(message, bytesRead);
 					if (log != null) log.WriteLine("--> " + packet.ToString());
-					string response = session.ParseRequest(packet);
+
+					bool isSignal;
+					string response = session.ParseRequest(packet, out isSignal);
 					if (response != null)
 					{
-						SendResponse(clientStream, response);
+						if (isSignal)
+							SendGlobal(response);
+						else
+							SendResponse(clientStream, response);
 					}
 				}
 			}

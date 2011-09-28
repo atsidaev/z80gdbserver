@@ -34,6 +34,7 @@ namespace z80gdbserver
 			public const string Error = "E00";
 			public const string Breakpoint = "T05";
 			public const string HaltedReason = "T05thread:00;";
+			public const string Interrupt = "T02";
 		}
 		
 		IDebuggable emulator;
@@ -134,10 +135,19 @@ namespace z80gdbserver
 			return "+$" + response + "#" + GDBPacket.CalculateCRC(response);
 		}
 		
-		public string ParseRequest(GDBPacket packet)
+		public string ParseRequest(GDBPacket packet, out bool isSignal)
 		{
 			string result = StandartAnswers.Empty;
-			
+			isSignal = false;
+
+			// ctrl+c is SIGINT
+			if (packet.GetBytes()[0] == 0x03)
+			{
+				emulator.DoStop();
+				result = StandartAnswers.Interrupt;
+				isSignal = true;
+			}
+
 			switch(packet.CommandName)
 			{
 			case '\0': // Command is empty ("+" in 99.99% cases)
@@ -203,7 +213,7 @@ namespace z80gdbserver
 		{
 			string command = packet.GetCommandParameters()[0];
 			if (command.StartsWith("Supported"))
-				return "PacketSize=ffff";
+				return "PacketSize=4000";
 			if (command.StartsWith("C"))
 				return StandartAnswers.Empty;
 			if (command.StartsWith("Attached"))
