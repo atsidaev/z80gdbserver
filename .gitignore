@@ -2,3 +2,5 @@
 *.userprefs
 
 *.suo
+/Backup
+/z80gdbserver/obj

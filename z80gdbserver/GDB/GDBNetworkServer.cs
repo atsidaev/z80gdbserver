@@ -29,19 +29,21 @@ namespace z80gdbserver
 	public class GDBNetworkServer : IDisposable
 	{
 		ASCIIEncoding encoder = new ASCIIEncoding();
-		
-		TcpListener listener;
-		IDebuggable emulator;
-		Thread socketListener;
 
+		IDebuggable emulator;
+		GDBJtagDevice jtagDevice;
+
+		TcpListener listener;
+		Thread socketListener;
 		List<TcpClient> clients = new List<TcpClient>();
 
 		StreamWriter log = null;
 
-		public GDBNetworkServer(IDebuggable emulator)
+		public GDBNetworkServer(IDebuggable emulator, GDBJtagDevice jtagDevice)
 		{
 			this.emulator = emulator;
-			
+			this.jtagDevice = jtagDevice;
+	
 			listener = new TcpListener(IPAddress.Any, 2000);
 			listener.Start ();
 			
@@ -51,6 +53,12 @@ namespace z80gdbserver
 		
 		public void Breakpoint(Breakpoint breakpoint)
 		{
+			// emulator.IsRunning= false;
+
+			// We do not need old breakpoints because GDB will set them again
+			emulator.ClearBreakpoints();
+			jtagDevice.ClearBreakpoints();
+
 			SendGlobal(GDBSession.FormatResponse(GDBSession.StandartAnswers.Breakpoint));
 		}
 
@@ -90,7 +98,7 @@ namespace z80gdbserver
 		{
 			TcpClient tcpClient = (TcpClient)client;
 			NetworkStream clientStream = tcpClient.GetStream();
-			GDBSession session = new GDBSession(emulator);
+			GDBSession session = new GDBSession(emulator, jtagDevice);
 
 			byte[] message = new byte[0x1000];
 			int bytesRead;

@@ -38,10 +38,12 @@ namespace z80gdbserver
 		}
 		
 		IDebuggable emulator;
+		GDBJtagDevice jtagDevice;
 
-		public GDBSession(IDebuggable emulator)
+		public GDBSession(IDebuggable emulator, GDBJtagDevice server)
 		{
 			this.emulator = emulator;
+			this.jtagDevice = server;
 		}
 		
 		#region Register stuff
@@ -307,7 +309,12 @@ namespace z80gdbserver
 			string[] parameters = packet.GetCommandParameters();
 			Breakpoint.BreakpointType type = Breakpoint.GetBreakpointType(int.Parse(parameters[0]));
 			ushort addr = Convert.ToUInt16(parameters[1], 16);
-			emulator.AddBreakpoint(addr);
+
+			if (type == Breakpoint.BreakpointType.Execution)
+				emulator.AddBreakpoint(addr);
+			else
+				jtagDevice.AddBreakpoint(type, addr);
+
 			return StandartAnswers.OK;
 		}
 		
@@ -316,7 +323,12 @@ namespace z80gdbserver
 			string[] parameters = packet.GetCommandParameters();
 			Breakpoint.BreakpointType type = Breakpoint.GetBreakpointType(int.Parse(parameters[0]));
 			ushort addr = Convert.ToUInt16(parameters[1], 16);
-			emulator.RemoveBreakpoint(addr);
+
+			if (type == Breakpoint.BreakpointType.Execution)
+				emulator.RemoveBreakpoint(addr);
+			else
+				jtagDevice.RemoveBreakpoint(addr);
+			
 			return StandartAnswers.OK;
 		}
 	}

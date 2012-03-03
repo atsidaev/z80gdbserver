@@ -71,7 +71,6 @@
     <Compile Include="GDB\GDBNetworkServer.cs" />
     <Compile Include="GDB\GDBSession.cs" />
     <Compile Include="GDB\GDBPacket.cs" />
-    <Compile Include="GNUDebugBridge.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>

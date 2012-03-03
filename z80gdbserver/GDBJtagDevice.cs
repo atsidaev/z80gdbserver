@@ -27,13 +27,20 @@ namespace z80gdbserver
 	{
 		GDBNetworkServer server;
 		IDebuggable emulator;
+		IBusManager busManager;
+		List<Breakpoint> accessBreakpoints = new List<Breakpoint>();
 
 		public void Attach(IDebuggable dbg)
 		{
 			emulator = dbg;
 			emulator.Breakpoint += OnBreakpoint;
 
-			server = new GDBNetworkServer(emulator);
+			// For memory read/write breakpoints:
+			busManager.SubscribeWRMEM(0x0000, 0x0000, new BusWriteProc(OnMemoryWrite));
+			busManager.SubscribeRDMEM(0x0000, 0x0000, new BusReadProc(OnMemoryRead));
+			
+
+			server = new GDBNetworkServer(emulator, this);
 		}
 
 		public void Detach()
@@ -51,6 +58,7 @@ namespace z80gdbserver
 
 		public void BusInit(IBusManager bmgr)
 		{
+			this.busManager = bmgr;
 		}
 
 		private int m_busOrder = 0;
@@ -81,6 +89,35 @@ namespace z80gdbserver
 		void OnBreakpoint(object sender, EventArgs args)
 		{
 			server.Breakpoint(new Breakpoint(Breakpoint.BreakpointType.Execution, emulator.CPU.regs.PC));
+		}
+
+		void OnMemoryWrite(ushort addr, byte value)
+		{
+			Breakpoint breakPoint = accessBreakpoints.FirstOrDefault(bp => bp.Address == addr && (bp.Type == Breakpoint.BreakpointType.Write || bp.Type == Breakpoint.BreakpointType.Access));
+			if (breakPoint != null)
+				server.Breakpoint(breakPoint);
+		}
+
+		void OnMemoryRead(ushort addr, ref byte value)
+		{
+			Breakpoint breakPoint = accessBreakpoints.FirstOrDefault(bp => bp.Address == addr && (bp.Type == Breakpoint.BreakpointType.Read || bp.Type == Breakpoint.BreakpointType.Access));
+			if (breakPoint != null)
+				server.Breakpoint(breakPoint);
+		}
+
+		public void AddBreakpoint(Breakpoint.BreakpointType type, ushort address)
+		{
+			accessBreakpoints.Add(new Breakpoint(type, address));
+		}
+
+		public void RemoveBreakpoint(ushort address)
+		{
+			accessBreakpoints.RemoveAll(b => b.Address == address);
+		}
+
+		public void ClearBreakpoints()
+		{
+			accessBreakpoints.Clear();
 		}
 	}
 }
