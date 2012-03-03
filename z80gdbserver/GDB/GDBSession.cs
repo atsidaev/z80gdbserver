@@ -265,11 +265,15 @@ namespace z80gdbserver
 		{
 			string[] parameters = packet.GetCommandParameters();
 			var addr = Convert.ToUInt16(parameters[0], 16);
-			if (int.Parse(parameters[1]) == 1)
-				return emulator.CPU.RDMEM(addr).ToLowEndianHexString();
-			else
-				if (int.Parse(parameters[1]) == 2)
-					return ((ushort)(emulator.CPU.RDMEM(addr) + (emulator.CPU.RDMEM((ushort)(addr + 1)) << 8))).ToLowEndianHexString();
+			var length = Convert.ToUInt16(parameters[1]);
+
+			string result = "";
+			if (length > 0)
+			{
+				for (int i = 0; i < length; i++)
+					result += emulator.CPU.RDMEM((ushort)(addr + i)).ToLowEndianHexString();
+				return result;
+			}
 			else
 				return StandartAnswers.Error;
 		}
@@ -278,17 +282,16 @@ namespace z80gdbserver
 		{
 			string[] parameters = packet.GetCommandParameters();
 			ushort addr = Convert.ToUInt16(parameters[0], 16);
-			if (int.Parse(parameters[1]) == 1)
-				emulator.CPU.WRMEM(addr, (byte)Convert.ToUInt16(parameters[2], 16));
+			int length = Convert.ToUInt16(parameters[1], 16);
+
+			if (length > 0)
+			{
+				for (int i = 0; i < length; i++)
+					emulator.CPU.WRMEM((ushort)(addr + i), (byte)Convert.ToUInt16(parameters[2].Substring(i * 2, 2), 16));
+			}
 			else
-				if (int.Parse(parameters[1]) == 2)
-				{
-					emulator.CPU.WRMEM(addr, (byte)Convert.ToUInt16(parameters[2].Substring(0, 2), 16));
-					emulator.CPU.WRMEM((ushort)(addr + 1), (byte)Convert.ToUInt16(parameters[2].Substring(2, 2), 16));
-				}
-				else
-					return StandartAnswers.Error;
-			
+				return StandartAnswers.Error;
+
 			return StandartAnswers.OK;
 		}
 		

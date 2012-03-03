@@ -37,7 +37,7 @@ namespace z80gdbserver
 		Thread socketListener;
 		List<TcpClient> clients = new List<TcpClient>();
 
-		StreamWriter log = null;
+		bool log = true;
 
 		public GDBNetworkServer(IDebuggable emulator, GDBJtagDevice jtagDevice)
 		{
@@ -126,7 +126,8 @@ namespace z80gdbserver
 				if (bytesRead > 0)
 				{
 					GDBPacket packet = new GDBPacket(message, bytesRead);
-					if (log != null) log.WriteLine("--> " + packet.ToString());
+					if (log) 
+						ZXMAK2.Logging.Logger.GetLogger().LogTrace("--> " + packet.ToString());
 
 					bool isSignal;
 					string response = session.ParseRequest(packet, out isSignal);
@@ -140,14 +141,13 @@ namespace z80gdbserver
 				}
 			}
 			tcpClient.Close ();
-			
-			if (log != null) 
-				log.Close();
 		}
 		
 		void SendResponse(Stream stream, string response)
 		{
-			if (log != null) log.WriteLine("<-- " + response);
+			if (log) 
+				ZXMAK2.Logging.Logger.GetLogger().LogTrace("<-- " + response);
+
 			byte[] bytes = encoder.GetBytes(response);
 			stream.Write(bytes, 0, bytes.Length);	
 		}
