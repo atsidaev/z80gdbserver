@@ -1,10 +1,11 @@
-This is simple GDB server for Z80 processor. It is created as potential
-plug-in to ZXMAK2 emulator so it uses few classes from ZXMAK2.EXE file.
+This is a GDB server for Z80 processor. It's made as a plugin to ZXMAK2 ZX Spectrum emulator. More info about emul you can find at (in Russian, use translator):
+http://zx.pk.ru/showthread.php?t=16830
 
 You should use gdb-z80 (https://github.com/legumbre/gdb-z80) as a client.
 Connection can be performed by gdb command
   
   target remote localhost:2000
 
+If you are interested in standalone Z80 GDB server please take a look at 'stand-alone' tag (it uses few classes from ZXMAK too)
 --
 Alexander Tsidaev
