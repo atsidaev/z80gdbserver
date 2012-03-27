@@ -222,6 +222,8 @@ namespace z80gdbserver
 				return "1";
 			if (command.StartsWith("TStatus"))
 				return StandartAnswers.Empty;
+			if (command.StartsWith("Offset"))
+				return StandartAnswers.Error;
 			return StandartAnswers.OK;
 		}
 
