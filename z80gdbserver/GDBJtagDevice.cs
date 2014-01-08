@@ -19,11 +19,12 @@ using System.Collections.Generic;
 using System.Linq;
 
 using ZXMAK2.Engine.Z80;
-using ZXMAK2.Engine.Interfaces;
+using ZXMAK2.Entities;
+using ZXMAK2.Interfaces;
 
 namespace z80gdbserver
 {
-	public class GDBJtagDevice : IBusDevice, IJtagDevice
+	public class GDBJtagDevice : BusDeviceBase, IJtagDevice
 	{
 		GDBNetworkServer server;
 		IDebuggable emulator;
@@ -36,8 +37,8 @@ namespace z80gdbserver
 			emulator.Breakpoint += OnBreakpoint;
 
 			// For memory read/write breakpoints:
-			busManager.SubscribeWRMEM(0x0000, 0x0000, new BusWriteProc(OnMemoryWrite));
-			busManager.SubscribeRDMEM(0x0000, 0x0000, new BusReadProc(OnMemoryRead));
+			busManager.SubscribeWrMem(0x0000, 0x0000, new BusWriteProc(OnMemoryWrite));
+			busManager.SubscribeRdMem(0x0000, 0x0000, new BusReadProc(OnMemoryRead));
 			
 
 			server = new GDBNetworkServer(emulator, this);
@@ -48,15 +49,15 @@ namespace z80gdbserver
 			server.Dispose();
 		}
 
-		public void BusConnect()
+		public override void BusConnect()
 		{
 		}
 
-		public void BusDisconnect()
+		public override void BusDisconnect()
 		{
 		}
 
-		public void BusInit(IBusManager bmgr)
+		public override void BusInit(IBusManager bmgr)
 		{
 			this.busManager = bmgr;
 		}
@@ -68,20 +69,20 @@ namespace z80gdbserver
 			set { m_busOrder = value; }
 		}
 
-		public BusCategory Category
+		public override BusDeviceCategory Category
 		{
 			get
 			{
-				return BusCategory.Other;
+				return BusDeviceCategory.Other;
 			}
 		}
 
-		public string Description
+		public override string Description
 		{
 			get { return "Interface for interaction with gdb debugger "; }
 		}
 
-		public string Name
+		public override string Name
 		{
 			get { return "GNU Debugger Interface"; }
 		}

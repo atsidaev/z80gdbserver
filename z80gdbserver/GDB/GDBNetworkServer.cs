@@ -22,7 +22,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using ZXMAK2.Engine.Interfaces;
+using ZXMAK2;
+using ZXMAK2.Interfaces;
 
 namespace z80gdbserver
 {
@@ -127,7 +128,7 @@ namespace z80gdbserver
 				{
 					GDBPacket packet = new GDBPacket(message, bytesRead);
 					if (log) 
-						ZXMAK2.Logging.Logger.GetLogger().LogTrace("--> " + packet.ToString());
+						LogAgent.Info("--> " + packet.ToString());
 
 					bool isSignal;
 					string response = session.ParseRequest(packet, out isSignal);
@@ -145,8 +146,8 @@ namespace z80gdbserver
 		
 		void SendResponse(Stream stream, string response)
 		{
-			if (log) 
-				ZXMAK2.Logging.Logger.GetLogger().LogTrace("<-- " + response);
+			if (log)
+				LogAgent.Info("<-- " + response);
 
 			byte[] bytes = encoder.GetBytes(response);
 			stream.Write(bytes, 0, bytes.Length);	
