@@ -73,7 +73,7 @@ namespace z80gdbserver
 		{
 			get
 			{
-				return BusDeviceCategory.Other;
+				return BusDeviceCategory.Debugger;
 			}
 		}
 

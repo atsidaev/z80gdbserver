@@ -58,9 +58,8 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="ZXMAK2, Version=2.2.2.0, Culture=neutral, processorArchitecture=x86">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\utils\zxmak\ZXMAK2.exe</HintPath>
+    <Reference Include="ZXMAK2">
+      <HintPath>..\..\private\zx\zxmak2\ZXMAK2.exe</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
