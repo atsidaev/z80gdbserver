@@ -21,7 +21,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 using ZXMAK2.Engine.Z80;
-using ZXMAK2.Engine.Interfaces;
+using ZXMAK2.Interfaces;
 
 namespace z80gdbserver
 {
@@ -316,7 +316,7 @@ namespace z80gdbserver
 			ushort addr = Convert.ToUInt16(parameters[1], 16);
 
 			if (type == Breakpoint.BreakpointType.Execution)
-				emulator.AddBreakpoint(addr);
+				emulator.AddBreakpoint(new ZXMAK2.Entities.Breakpoint(addr));
 			else
 				jtagDevice.AddBreakpoint(type, addr);
 
@@ -330,7 +330,7 @@ namespace z80gdbserver
 			ushort addr = Convert.ToUInt16(parameters[1], 16);
 
 			if (type == Breakpoint.BreakpointType.Execution)
-				emulator.RemoveBreakpoint(addr);
+				emulator.RemoveBreakpoint(new ZXMAK2.Entities.Breakpoint(addr));
 			else
 				jtagDevice.RemoveBreakpoint(addr);
 			
