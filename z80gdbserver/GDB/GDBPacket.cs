@@ -18,70 +18,73 @@ using System;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace z80gdbserver
+namespace z80gdbserver.Gdb
 {
 	public class GDBPacket
 	{
-		private byte[] message;
-		private int length;
-		private string text;
-		
-		char commandName;
-		string[] parameters;
-		
-		static Regex removePrefix = new Regex(@"^[\+\$]+", RegexOptions.Compiled);
-		
+		private readonly byte[] _message;
+		private readonly int _length;
+		private string _text;
+
+		private char _commandName;
+		private readonly string[] _parameters;
+
+		private static readonly Regex RemovePrefix = new Regex(@"^[\+\$]+", RegexOptions.Compiled);
+
 		public GDBPacket(byte[] message, int length)
 		{
-			this.message = message;
-			this.length = length;
-			
-			ASCIIEncoding encoder = new ASCIIEncoding();
-			text = encoder.GetString(message, 0, length);
-			
-			string request = removePrefix.Replace(text, "");
+			_message = message;
+			_length = length;
+
+			var encoder = new ASCIIEncoding();
+			_text = encoder.GetString(message, 0, length);
+
+			var request = RemovePrefix.Replace(_text, "");
 			if (String.IsNullOrEmpty(request))
-				commandName = '\0';
+			{
+				_commandName = '\0';
+			}
 			else
 			{
-				commandName = request[0];
-				parameters = request.Substring(1).Split(new char[] { ',', '#', ':', ';' });
+				_commandName = request[0];
+				_parameters = request.Substring(1).Split(new char[] { ',', '#', ':', ';' });
 			}
 		}
-		
-		public override string ToString ()
+
+		public override string ToString()
 		{
-			return text;
+			return _text;
 		}
-		
+
 		public byte[] GetBytes()
 		{
-			return message;
+			return _message;
 		}
-		
+
 		public int Length
 		{
-			get { return length; }
+			get { return _length; }
 		}
-		
+
 		public char CommandName
 		{
-			get { return commandName; }
+			get { return _commandName; }
 		}
-		
+
 		public string[] GetCommandParameters()
 		{
-			return parameters;
+			return _parameters;
 		}
-		
-		static public string CalculateCRC(string str)
+
+		public static string CalculateCRC(string str)
 		{
-			ASCIIEncoding encoder = new ASCIIEncoding();
-			byte[] bytes = encoder.GetBytes(str);
-			int crc = 0;
-			for (int i = 0; i < bytes.Length; i++)
+			var encoder = new ASCIIEncoding();
+			var bytes = encoder.GetBytes(str);
+			var crc = 0;
+			for (var i = 0; i < bytes.Length; i++)
+			{
 				crc += bytes[i];
-			
+			}
 			return ((byte)crc).ToLowEndianHexString().ToLowerInvariant();
 		}
 	}

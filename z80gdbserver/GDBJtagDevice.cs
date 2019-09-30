@@ -13,35 +13,72 @@
  * You should have received a copy of the GNU General Public License along with z80gdbserver. 
  * If not, see http://www.gnu.org/licenses/.
  */
-
 using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Xml;
+using System.Text;
+using System.Collections.Generic;
 
-using ZXMAK2.Engine.Z80;
-using ZXMAK2.Entities;
-using ZXMAK2.Interfaces;
+using z80gdbserver.Gdb;
 
-namespace z80gdbserver
+using ZXMAK2.Engine;
+using ZXMAK2.Engine.Entities;
+using ZXMAK2.Engine.Interfaces;
+
+using Breakpoint = z80gdbserver.Breakpoint;
+
+namespace ZXMAK2.Hardware.GdbServer
 {
 	public class GDBJtagDevice : BusDeviceBase, IJtagDevice
 	{
-		GDBNetworkServer server;
-		IDebuggable emulator;
-		IBusManager busManager;
-		List<Breakpoint> accessBreakpoints = new List<Breakpoint>();
+		private GDBNetworkServer server;
+		private IDebuggable _emulator;
+		private IBusManager busManager;
+		private readonly List<Breakpoint> accessBreakpoints = new List<Breakpoint>();
+		private int _port;
+
+
+		public GDBJtagDevice()
+		{
+			Category = BusDeviceCategory.Debugger;
+			Name = "GDB-Z80 SERVER";
+			Port = 2000;
+			Log = true;
+		}
+
+
+		public int Port
+		{
+			get { return _port; }
+			set
+			{
+				_port = value;
+
+				var builder = new StringBuilder();
+				builder.Append("Interface for interaction with gdb debugger");
+				builder.Append(Environment.NewLine);
+				builder.Append(Environment.NewLine);
+				builder.Append(string.Format("Listening on: {0}:{1}", "localhost", _port));
+				builder.Append(Environment.NewLine);
+				builder.Append(Environment.NewLine);
+				builder.Append("Use gdb-z80 to connect");
+				Description = builder.ToString();
+			}
+		}
+
+		public bool Log { get; set; }
 
 		public void Attach(IDebuggable dbg)
 		{
-			emulator = dbg;
-			emulator.Breakpoint += OnBreakpoint;
+			_emulator = dbg;
+			_emulator.Breakpoint += OnBreakpoint;
 
 			// For memory read/write breakpoints:
-			busManager.SubscribeWrMem(0x0000, 0x0000, new BusWriteProc(OnMemoryWrite));
-			busManager.SubscribeRdMem(0x0000, 0x0000, new BusReadProc(OnMemoryRead));
-			
+			busManager.Events.SubscribeWrMem(0x0000, 0x0000, OnMemoryWrite);
+			busManager.Events.SubscribeRdMem(0x0000, 0x0000, OnMemoryRead);
 
-			server = new GDBNetworkServer(emulator, this);
+			var bridge = new DebugTarget(_emulator, this);
+			server = new GDBNetworkServer(bridge, Port);
 		}
 
 		public void Detach()
@@ -62,34 +99,9 @@ namespace z80gdbserver
 			this.busManager = bmgr;
 		}
 
-		private int m_busOrder = 0;
-		public int BusOrder
-		{
-			get { return m_busOrder; }
-			set { m_busOrder = value; }
-		}
-
-		public override BusDeviceCategory Category
-		{
-			get
-			{
-				return BusDeviceCategory.Debugger;
-			}
-		}
-
-		public override string Description
-		{
-			get { return "Interface for interaction with gdb debugger "; }
-		}
-
-		public override string Name
-		{
-			get { return "GNU Debugger Interface"; }
-		}
-
 		void OnBreakpoint(object sender, EventArgs args)
 		{
-			server.Breakpoint(new Breakpoint(Breakpoint.BreakpointType.Execution, emulator.CPU.regs.PC));
+			server.Breakpoint(new Breakpoint(Breakpoint.BreakpointType.Execution, _emulator.CPU.regs.PC));
 		}
 
 		void OnMemoryWrite(ushort addr, byte value)
@@ -119,6 +131,20 @@ namespace z80gdbserver
 		public void ClearBreakpoints()
 		{
 			accessBreakpoints.Clear();
+		}
+
+		protected override void OnConfigSave(XmlNode node)
+		{
+			base.OnConfigSave(node);
+			Utils.SetXmlAttribute(node, "port", Port);
+			Utils.SetXmlAttribute(node, "log", Log);
+		}
+
+		protected override void OnConfigLoad(XmlNode node)
+		{
+			base.OnConfigLoad(node);
+			Port = Utils.GetXmlAttributeAsInt32(node, "port", Port);
+			Log = Utils.GetXmlAttributeAsBool(node, "log", Log);
 		}
 	}
 }

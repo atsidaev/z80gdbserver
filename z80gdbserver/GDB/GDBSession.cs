@@ -13,17 +13,14 @@
  * You should have received a copy of the GNU General Public License along with z80gdbserver. 
  * If not, see http://www.gnu.org/licenses/.
  */
-
 using System;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 
-using ZXMAK2.Engine.Z80;
-using ZXMAK2.Interfaces;
+using ZXMAK2.Engine.Cpu;
 
-namespace z80gdbserver
+using z80gdbserver.Interfaces;
+
+namespace z80gdbserver.Gdb
 {
 	public class GDBSession
 	{
@@ -36,24 +33,23 @@ namespace z80gdbserver
 			public const string HaltedReason = "T05thread:00;";
 			public const string Interrupt = "T02";
 		}
-		
-		IDebuggable emulator;
-		GDBJtagDevice jtagDevice;
 
-		public GDBSession(IDebuggable emulator, GDBJtagDevice server)
+		private readonly IDebugTarget _target;
+
+		public GDBSession(IDebugTarget target)
 		{
-			this.emulator = emulator;
-			this.jtagDevice = server;
+			_target = target;
 		}
-		
+
 		#region Register stuff
+
 		public enum RegisterSize { Byte, Word };
-		
+
 		// GDB regs order:
 		// "a", "f", "bc", "de", "hl", "ix", "iy", "sp", "i", "r",
 		// "ax", "fx", "bcx", "dex", "hlx", "pc"
-		
-		static RegisterSize[] registerSize = new RegisterSize[] {
+
+		private static readonly RegisterSize[] s_registerSize = new RegisterSize[] {
 			RegisterSize.Byte, RegisterSize.Byte,
 			RegisterSize.Word, RegisterSize.Word,
 			RegisterSize.Word, RegisterSize.Word,
@@ -63,8 +59,8 @@ namespace z80gdbserver
 			RegisterSize.Word, RegisterSize.Word,
 			RegisterSize.Word, RegisterSize.Word
 		};
-		
-		Action<REGS, ushort>[] regSetters = new Action<REGS, ushort>[] {
+
+		private static readonly Action<CpuRegs, ushort>[] s_regSetters = new Action<CpuRegs, ushort>[] {
 			(r, v) => r.A = (byte)v,
 			(r, v) => r.F = (byte)v,
 			(r, v) => r.BC = v,
@@ -82,8 +78,8 @@ namespace z80gdbserver
 			(r, v) => r._HL = v,
 			(r, v) => r.PC = v
 		};
-		
-		Func<REGS, int>[] regGetters = new Func<REGS, int>[] {
+
+		private static readonly Func<CpuRegs, int>[] s_regGetters = new Func<CpuRegs, int>[] {
 			r => r.A,
 			r => r.F,
 			r => r.BC,
@@ -101,22 +97,23 @@ namespace z80gdbserver
 			r => r._HL,
 			r => r.PC
 		};
-		
-		static public int RegistersCount { get { return registerSize.Length; } }
+
+		public static int RegistersCount { get { return s_registerSize.Length; } }
+
 		public static RegisterSize GetRegisterSize(int i)
 		{
-			return registerSize[i];
+			return s_registerSize[i];
 		}
 
 		public string GetRegisterAsHex(int reg)
 		{
-			int result = regGetters[reg](emulator.CPU.regs);
-			if (registerSize[reg] == RegisterSize.Byte)
+			int result = s_regGetters[reg](_target.CPU.regs);
+			if (s_registerSize[reg] == RegisterSize.Byte)
 				return ((byte)(result)).ToLowEndianHexString();
 			else
 				return ((ushort)(result)).ToLowEndianHexString();
 		}
-		
+
 		public bool SetRegister(int reg, string hexValue)
 		{
 			int val = 0;
@@ -124,94 +121,107 @@ namespace z80gdbserver
 				val = Convert.ToUInt16(hexValue.Substring(0, 2), 16) | (Convert.ToUInt16(hexValue.Substring(2, 2), 16) << 8);
 			else
 				val = Convert.ToUInt16(hexValue, 16);
-				
-			regSetters[reg](emulator.CPU.regs, (ushort)val);
-			
+
+			s_regSetters[reg](_target.CPU.regs, (ushort)val);
+
 			return true;
 		}
-		
+
 		#endregion
-		
-		static public string FormatResponse(string response)
+
+		public static string FormatResponse(string response)
 		{
 			return "+$" + response + "#" + GDBPacket.CalculateCRC(response);
 		}
-		
+
 		public string ParseRequest(GDBPacket packet, out bool isSignal)
 		{
-			string result = StandartAnswers.Empty;
+			var result = StandartAnswers.Empty;
 			isSignal = false;
 
 			// ctrl+c is SIGINT
 			if (packet.GetBytes()[0] == 0x03)
 			{
-				emulator.DoStop();
+				_target.DoStop();
 				result = StandartAnswers.Interrupt;
 				isSignal = true;
 			}
 
-			switch(packet.CommandName)
+			try
 			{
-			case '\0': // Command is empty ("+" in 99.99% cases)
-				return null;
-			case 'q':
-				result = GeneralQueryResponse(packet); break;
-			case 'Q':
-				result = GeneralQueryResponse(packet); break;
-			case '?':
-				result = GetTargetHaltedReason(packet); break;
-			case '!': // extended connection
-				break;
-			case 'g': // read registers
-				result = ReadRegisters(packet); break;
-			case 'G': // write registers
-				result = WriteRegisters(packet); break;
-			case 'm': // read memory
-				result = ReadMemory(packet);break;
-			case 'M': // write memory
-				result = WriteMemory(packet);break;
-			case 'X': // write memory binary
-				// Not implemented yet, client shoul use M instead
-				//result = StandartAnswers.OK;
-				break;
-			case 'p': // get single register
-				result = GetRegister(packet);break;
-			case 'P': // set single register
-				result = SetRegister(packet); break;
-			case 'v': // some requests, mainly vCont
-				result = ExecutionRequest(packet);break;
-			case 's': //stepi
-				emulator.CPU.ExecCycle();
-				result = "T05";
-				break;
-			case 'z': // remove bp
-				result = RemoveBreakpoint(packet);
-				break;
-			case 'Z': // insert bp
-				result = SetBreakpoint(packet);
-				break;
-			case 'k': // Kill the target
-				break;
-			case 'H': // set thread
-				result = StandartAnswers.OK; // we do not have threads, so ignoring this command is OK
-				break;
-			case 'c': // continue
-				emulator.DoRun();
-				result = null;
-				break;
-			case 'D': // Detach from client
-				emulator.DoRun();
-				result = StandartAnswers.OK;
-				break;
+				switch (packet.CommandName)
+				{
+					case '\0': // Command is empty ("+" in 99.99% cases)
+						return null;
+					case 'q':
+						result = GeneralQueryResponse(packet); break;
+					case 'Q':
+						result = GeneralQueryResponse(packet); break;
+					case '?':
+						result = GetTargetHaltedReason(packet); break;
+					case '!': // extended connection
+						break;
+					case 'g': // read registers
+						result = ReadRegisters(packet); break;
+					case 'G': // write registers
+						result = WriteRegisters(packet); break;
+					case 'm': // read memory
+						result = ReadMemory(packet); break;
+					case 'M': // write memory
+						result = WriteMemory(packet); break;
+					case 'X': // write memory binary
+							  // Not implemented yet, client shoul use M instead
+							  //result = StandartAnswers.OK;
+						break;
+					case 'p': // get single register
+						result = GetRegister(packet); break;
+					case 'P': // set single register
+						result = SetRegister(packet); break;
+					case 'v': // some requests, mainly vCont
+						result = ExecutionRequest(packet); break;
+					case 's': //stepi
+						_target.CPU.ExecCycle();
+						result = "T05";
+						break;
+					case 'z': // remove bp
+						result = RemoveBreakpoint(packet);
+						break;
+					case 'Z': // insert bp
+						result = SetBreakpoint(packet);
+						break;
+					case 'k': // Kill the target
+						break;
+					case 'H': // set thread
+						result = StandartAnswers.OK; // we do not have threads, so ignoring this command is OK
+						break;
+					case 'c': // continue
+						_target.DoRun();
+						result = null;
+						break;
+					case 'D': // Detach from client
+						_target.DoRun();
+						result = StandartAnswers.OK;
+						break;
+				}
 			}
-			
+			catch (Exception ex)
+			{
+				_target.LogException?.Invoke(ex);
+				result = GetErrorAnswer(Errno.EPERM);
+			}
+
 			if (result == null)
 				return "+";
 			else
 				return FormatResponse(result);
 		}
-		
-		string GeneralQueryResponse(GDBPacket packet)
+
+		private static string GetErrorAnswer(Errno errno)
+		{
+			return string.Format("E{0:D2}", (int)errno);
+		}
+
+		private string GeneralQueryResponse(GDBPacket packet)
 		{
 			string command = packet.GetCommandParameters()[0];
 			if (command.StartsWith("Supported"))
@@ -227,19 +237,22 @@ namespace z80gdbserver
 			return StandartAnswers.OK;
 		}
 
-		string GetTargetHaltedReason(GDBPacket packet)
+		private string GetTargetHaltedReason(GDBPacket packet)
 		{
 			return StandartAnswers.HaltedReason;
 		}
-		
-		string ReadRegisters(GDBPacket packet)
+
+		private string ReadRegisters(GDBPacket packet)
 		{
-			return String.Join("", Enumerable.Range(0, RegistersCount - 1).Select(i => GetRegisterAsHex(i)).ToArray());
+			var values = Enumerable.Range(0, RegistersCount - 1)
+				.Select(i => GetRegisterAsHex(i))
+				.ToArray();
+			return String.Join("", values);
 		}
-		
-		string WriteRegisters(GDBPacket packet)
+
+		private string WriteRegisters(GDBPacket packet)
 		{
-			string regsData = packet.GetCommandParameters()[0];
+			var regsData = packet.GetCommandParameters()[0];
 			for (int i = 0, pos = 0; i < RegistersCount; i++)
 			{
 				int currentRegisterLength = GetRegisterSize(i) == RegisterSize.Word ? 4 : 2;
@@ -248,92 +261,101 @@ namespace z80gdbserver
 			}
 			return StandartAnswers.OK;
 		}
-		
-		string GetRegister(GDBPacket packet)
+
+		private string GetRegister(GDBPacket packet)
 		{
 			return GetRegisterAsHex(Convert.ToInt32(packet.GetCommandParameters()[0], 16));
 		}
-		
-		string SetRegister(GDBPacket packet)
+
+		private string SetRegister(GDBPacket packet)
 		{
-			string[] parameters = packet.GetCommandParameters()[0].Split(new char[] { '=' });
+			var parameters = packet.GetCommandParameters()[0].Split(new char[] { '=' });
 			if (SetRegister(Convert.ToInt32(parameters[0], 16), parameters[1]))
-					return StandartAnswers.OK;
-				else
-					return StandartAnswers.Error;
-		}
-		
-		string ReadMemory(GDBPacket packet)
-		{
-			string[] parameters = packet.GetCommandParameters();
-			var addr = Convert.ToUInt16(parameters[0], 16);
-			var length = Convert.ToUInt16(parameters[1]);
-
-			string result = "";
-			if (length > 0)
-			{
-				for (int i = 0; i < length; i++)
-					result += emulator.CPU.RDMEM((ushort)(addr + i)).ToLowEndianHexString();
-				return result;
-			}
+				return StandartAnswers.OK;
 			else
 				return StandartAnswers.Error;
 		}
-			
-		string WriteMemory(GDBPacket packet)
+
+		private string ReadMemory(GDBPacket packet)
 		{
-			string[] parameters = packet.GetCommandParameters();
-			ushort addr = Convert.ToUInt16(parameters[0], 16);
-			int length = Convert.ToUInt16(parameters[1], 16);
-
-			if (length > 0)
+			var parameters = packet.GetCommandParameters();
+			if (parameters.Length < 2)
 			{
-				for (int i = 0; i < length; i++)
-					emulator.CPU.WRMEM((ushort)(addr + i), (byte)Convert.ToUInt16(parameters[2].Substring(i * 2, 2), 16));
+				return GetErrorAnswer(Errno.EPERM);
 			}
-			else
-				return StandartAnswers.Error;
+			var arg1 = Convert.ToUInt32(parameters[0], 16);
+			var arg2 = Convert.ToUInt32(parameters[1], 16);
+			if (arg1 > ushort.MaxValue || arg2 > ushort.MaxValue)
+			{
+				return GetErrorAnswer(Errno.EPERM);
+			}
+			var addr = (ushort)arg1;
+			var length = (ushort)arg2;
+			var result = string.Empty;
+			for (var i = 0; i < length; i++)
+			{
+				var hex = _target.CPU.RDMEM((ushort)(addr + i))
+					.ToLowEndianHexString();
+				result += hex;
+			}
+			return result;
+		}
 
+		private string WriteMemory(GDBPacket packet)
+		{
+			var parameters = packet.GetCommandParameters();
+			if (parameters.Length < 3)
+			{
+				return GetErrorAnswer(Errno.ENOENT);
+			}
+			var arg1 = Convert.ToUInt32(parameters[0], 16);
+			var arg2 = Convert.ToUInt32(parameters[1], 16);
+			if (arg1 > ushort.MaxValue || arg2 > ushort.MaxValue)
+			{
+				return GetErrorAnswer(Errno.ENOENT);
+			}
+			var addr = (ushort)arg1;
+			var length = (ushort)arg2;
+			for (var i = 0; i < length; i++)
+			{
+				var hex = parameters[2].Substring(i * 2, 2);
+				var value = Convert.ToByte(hex, 16);
+				_target.CPU.WRMEM((ushort)(addr + i), value);
+			}
 			return StandartAnswers.OK;
 		}
-		
-		string ExecutionRequest(GDBPacket packet)
+
+		private string ExecutionRequest(GDBPacket packet)
 		{
 			string command = packet.GetCommandParameters()[0];
 			if (command.StartsWith("Cont?"))
 				return "";
 			if (command.StartsWith("Cont"))
 			{
-				
+
 			}
 			return StandartAnswers.Empty;
 		}
-		
-		string SetBreakpoint(GDBPacket packet)
+
+		private string SetBreakpoint(GDBPacket packet)
 		{
 			string[] parameters = packet.GetCommandParameters();
 			Breakpoint.BreakpointType type = Breakpoint.GetBreakpointType(int.Parse(parameters[0]));
 			ushort addr = Convert.ToUInt16(parameters[1], 16);
 
-			if (type == Breakpoint.BreakpointType.Execution)
-				emulator.AddBreakpoint(new ZXMAK2.Entities.Breakpoint(addr));
-			else
-				jtagDevice.AddBreakpoint(type, addr);
+			_target.AddBreakpoint(type, addr);
 
 			return StandartAnswers.OK;
 		}
-		
-		string RemoveBreakpoint(GDBPacket packet)
+
+		private string RemoveBreakpoint(GDBPacket packet)
 		{
 			string[] parameters = packet.GetCommandParameters();
 			Breakpoint.BreakpointType type = Breakpoint.GetBreakpointType(int.Parse(parameters[0]));
 			ushort addr = Convert.ToUInt16(parameters[1], 16);
 
-			if (type == Breakpoint.BreakpointType.Execution)
-				emulator.RemoveBreakpoint(new ZXMAK2.Entities.Breakpoint(addr));
-			else
-				jtagDevice.RemoveBreakpoint(addr);
-			
+			_target.RemoveBreakpoint(type, addr);
+
 			return StandartAnswers.OK;
 		}
 	}

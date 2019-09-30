@@ -13,157 +13,173 @@
  * You should have received a copy of the GNU General Public License along with z80gdbserver. 
  * If not, see http://www.gnu.org/licenses/.
  */
-
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
-using ZXMAK2;
-using ZXMAK2.Interfaces;
+using System.Threading.Tasks;
+using z80gdbserver.Interfaces;
 
-namespace z80gdbserver
+namespace z80gdbserver.Gdb
 {
 	public class GDBNetworkServer : IDisposable
 	{
-		ASCIIEncoding encoder = new ASCIIEncoding();
+		private readonly ASCIIEncoding _encoder = new ASCIIEncoding();
 
-		IDebuggable emulator;
-		GDBJtagDevice jtagDevice;
+		private TcpListener _listener;
+		private readonly IDebugTarget _target;
+		private readonly int _port;
 
-		TcpListener listener;
-		Thread socketListener;
-		List<TcpClient> clients = new List<TcpClient>();
+		private readonly object _clientsLock = new object();
+		private readonly List<TcpClient> _clients = new List<TcpClient>();
 
-		bool log = true;
-
-		public GDBNetworkServer(IDebuggable emulator, GDBJtagDevice jtagDevice)
+		public GDBNetworkServer(IDebugTarget target, int port)
 		{
-			this.emulator = emulator;
-			this.jtagDevice = jtagDevice;
-	
-			listener = new TcpListener(IPAddress.Any, 2000);
-			listener.Start ();
-			
-			socketListener = new Thread(ListeningThread);
-			socketListener.Start();
+			_target = target;
+			_port = port;
 		}
-		
-		public void Breakpoint(Breakpoint breakpoint)
-		{
-			// emulator.IsRunning= false;
 
+		public async Task StartServer()
+		{
+			_listener = new TcpListener(IPAddress.Any, _port);
+			_listener.Start();
+
+			await WaitForClients();
+		}
+
+		public async Task Breakpoint(Breakpoint breakpoint)
+		{
 			// We do not need old breakpoints because GDB will set them again
-			emulator.ClearBreakpoints();
-			jtagDevice.ClearBreakpoints();
+			_target.ClearBreakpoints();
 
-			SendGlobal(GDBSession.FormatResponse(GDBSession.StandartAnswers.Breakpoint));
+			await SendGlobal(GDBSession.FormatResponse(GDBSession.StandartAnswers.Breakpoint));
 		}
 
-		private void SendGlobal(string message)
+		private async Task SendGlobal(string message)
 		{
-			foreach (var client in clients.Where(c => c.Connected))
+			List<TcpClient> connectedClients;
+
+			lock (_clientsLock)
 			{
-				var stream = client.GetStream();
-				if (stream != null)
-					SendResponse(stream, message);
+				connectedClients = _clients.Where(c => c.Connected).ToList();
 			}
+
+			await Task.WhenAll(connectedClients.Select(c => SendResponse(c.GetStream(), message)));
 		}
-		
-		private void ListeningThread(object obj)
+
+		private async Task WaitForClients()
 		{
 			try
 			{
 				while (true)
 				{
-					TcpClient client = listener.AcceptTcpClient();
+					TcpClient client = await _listener.AcceptTcpClientAsync();
 
-					clients.Add(client);
-					clients.RemoveAll(c => !c.Connected);
+					lock (_clientsLock)
+					{
+						_clients.Add(client);
+						_clients.RemoveAll(c => !c.Connected);
+					}
 
-					Thread clientThread = new Thread(GDBClientConnected);
-					clientThread.Start(client);
+					ProcessGdbClient(client);
 				}
 			}
-			catch
+			catch(Exception ex)
 			{
-				// Here can be an exception because we interrupting blocking AcceptTcpClient()
-				// call on Dispose. We should not fail here, so try/catching
+				_target.LogException?.Invoke(ex);
 			}
 		}
-		
-		private void GDBClientConnected(object client)
+
+		private async Task ProcessGdbClient(TcpClient tcpClient)
 		{
-			TcpClient tcpClient = (TcpClient)client;
 			NetworkStream clientStream = tcpClient.GetStream();
-			GDBSession session = new GDBSession(emulator, jtagDevice);
+			GDBSession session = new GDBSession(_target);
 
 			byte[] message = new byte[0x1000];
 			int bytesRead;
 
-			// log = new StreamWriter("c:\\temp\\log.txt");
-			// log.AutoFlush = true;
+			_target.DoStop();
 
-			emulator.DoStop();
-			
-			while (true) {
-				bytesRead = 0;
-				
-				try {
-					bytesRead = clientStream.Read(message, 0, 4096);
-				} catch {
-					//a socket error has occured
+			while (true)
+			{
+				try
+				{
+					bytesRead = await clientStream.ReadAsync(message, 0, 4096);
+				}
+				catch (IOException iex)
+				{
+					var sex = iex.InnerException as SocketException;
+					if (sex == null || sex.SocketErrorCode != SocketError.Interrupted)
+					{
+						_target.LogException?.Invoke(sex);
+					}
 					break;
 				}
-				
-				if (bytesRead == 0) {
+				catch (SocketException sex)
+				{
+					if (sex.SocketErrorCode != SocketError.Interrupted)
+					{
+						_target.LogException?.Invoke(sex);
+					}
+					break;
+				}
+				catch (Exception ex)
+				{
+					_target.LogException?.Invoke(ex);
+					break;
+				}
+
+				if (bytesRead == 0)
+				{
 					//the client has disconnected from the server
 					break;
 				}
-				
+
 				if (bytesRead > 0)
 				{
 					GDBPacket packet = new GDBPacket(message, bytesRead);
-					if (log) 
-						LogAgent.Info("--> " + packet.ToString());
+					_target.Log?.Invoke($"--> {packet}");
 
 					bool isSignal;
 					string response = session.ParseRequest(packet, out isSignal);
 					if (response != null)
 					{
 						if (isSignal)
-							SendGlobal(response);
+							await SendGlobal(response);
 						else
-							SendResponse(clientStream, response);
+							await SendResponse(clientStream, response);
 					}
 				}
 			}
-			tcpClient.Close ();
-		}
-		
-		void SendResponse(Stream stream, string response)
-		{
-			if (log)
-				LogAgent.Info("<-- " + response);
 
-			byte[] bytes = encoder.GetBytes(response);
-			stream.Write(bytes, 0, bytes.Length);	
+			tcpClient.Client.Shutdown(SocketShutdown.Both);
+		}
+
+		private async Task SendResponse(Stream stream, string response)
+		{
+			_target.Log?.Invoke($"<-- {response}");
+
+			byte[] bytes = _encoder.GetBytes(response);
+			await stream.WriteAsync(bytes, 0, bytes.Length);
 		}
 
 		public void Dispose()
 		{
-			if (socketListener != null)
+			if (_listener != null)
 			{
-				listener.Stop();
+				_listener.Stop();
 
-				foreach (var client in clients)
-					if (client.Connected)
-						client.Close();
+				lock (_clientsLock)
+				{
+					foreach (var client in _clients)
+						if (client.Connected)
+							client.Client.Shutdown(SocketShutdown.Both);
+				}
 
-				socketListener.Abort();
+				_listener.Server.Shutdown(SocketShutdown.Both);
 			}
 		}
 	}

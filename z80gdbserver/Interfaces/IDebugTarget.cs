@@ -16,14 +16,34 @@
 
 using System;
 
-using ZXMAK2.Engine.Z80;
-using ZXMAK2.Interfaces;
+using ZXMAK2.Engine.Cpu.Processor;
 
-namespace z80gdbserver
+namespace z80gdbserver.Interfaces
 {
-	public interface IDebugBridge
+	public interface IDebugTarget
 	{
-		void Initialize(IDebuggable emulator);
+		Z80Cpu CPU {get;}
+		void ClearBreakpoints();
+		void DoRun();
+		void DoStop();
+		void AddBreakpoint(Breakpoint.BreakpointType type, ushort addr);
+		void RemoveBreakpoint(Breakpoint.BreakpointType type, ushort addr);
+
+		/// <summary>
+		/// Optional error logging, leave null if not needed
+		/// </summary>
+		Action<string> LogError {get;}
+
+		/// <summary>
+		/// Optional exception logging, leave null if not needed
+		/// </summary>
+		Action<Exception> LogException {get;}
+
+		/// <summary>
+		/// Optional logging, leave null if not needed
+		/// </summary>
+
+		Action<string> Log {get;}
 	}
 }
 
