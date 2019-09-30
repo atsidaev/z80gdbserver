@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\z80gdbserver\z80gdbserver.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="ZXMAK2">
+      <HintPath>..\..\ZXMAK2core\bin\Debug\netstandard2.0\ZXMAK2.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

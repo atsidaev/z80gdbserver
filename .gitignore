@@ -1,6 +1,7 @@
 /*/bin
+/*/obj
 *.userprefs
-
+.vs
 *.suo
 /Backup
 /z80gdbserver/obj

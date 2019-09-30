@@ -1,21 +1,42 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "z80gdbserver", "z80gdbserver\z80gdbserver.csproj", "{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.489
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "z80gdbserver", "z80gdbserver\z80gdbserver.csproj", "{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZXMAK2.Hardware.GdbServer", "ZXMAK2.Hardware.GdbServer\ZXMAK2.Hardware.GdbServer.csproj", "{B5AC7F80-7CBC-41EE-ACA4-D51D14527E87}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
 		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Debug|x86.ActiveCfg = Debug|x86
-		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Debug|x86.Build.0 = Debug|x86
-		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Release|x86.ActiveCfg = Release|x86
-		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Release|x86.Build.0 = Release|x86
+		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Debug|x86.Build.0 = Debug|Any CPU
+		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Release|x86.ActiveCfg = Release|Any CPU
+		{DB6C5EC6-2F63-47B6-B96B-756F2C9AAFF1}.Release|x86.Build.0 = Release|Any CPU
+		{B5AC7F80-7CBC-41EE-ACA4-D51D14527E87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B5AC7F80-7CBC-41EE-ACA4-D51D14527E87}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B5AC7F80-7CBC-41EE-ACA4-D51D14527E87}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B5AC7F80-7CBC-41EE-ACA4-D51D14527E87}.Debug|x86.Build.0 = Debug|Any CPU
+		{B5AC7F80-7CBC-41EE-ACA4-D51D14527E87}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B5AC7F80-7CBC-41EE-ACA4-D51D14527E87}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B5AC7F80-7CBC-41EE-ACA4-D51D14527E87}.Release|x86.ActiveCfg = Release|Any CPU
+		{B5AC7F80-7CBC-41EE-ACA4-D51D14527E87}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3215D27F-3292-4351-A2AD-4E69E4ED524D}
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
 		StartupItem = z80gdbserver\z80gdbserver.csproj

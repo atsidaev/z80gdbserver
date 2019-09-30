@@ -16,9 +16,9 @@ namespace ZXMAK2.Hardware.GdbServer
 	public class DebugTarget : IDebugTarget
 	{
 		private readonly IDebuggable _emulator;
-		private readonly GDBJtagDevice _jtagDevice;
+		private readonly GDBExternalJtagDevice _jtagDevice;
 
-		public DebugTarget(IDebuggable emulator, GDBJtagDevice jtagDevice)
+		public DebugTarget(IDebuggable emulator, GDBExternalJtagDevice jtagDevice)
 		{
 			_emulator = emulator;
 			_jtagDevice = jtagDevice;
